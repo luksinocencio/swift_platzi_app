@@ -30,3 +30,7 @@ struct LoginResponse: Codable {
         case refreshToken = "refresh_token"
     }
 }
+
+struct ErrorResponse: Codable {
+    let message: String?
+}

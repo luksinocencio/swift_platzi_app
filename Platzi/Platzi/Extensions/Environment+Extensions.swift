@@ -1,5 +1,5 @@
 import SwiftUI
 
 extension EnvironmentValues {
-    @Entry var authenticationController = AuthenticationController(httpClinet: HTTPClient())
+    @Entry var authenticationController = AuthenticationController(httpClient: HTTPClient())
 }
