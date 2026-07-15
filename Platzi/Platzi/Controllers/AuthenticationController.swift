@@ -13,5 +13,18 @@ struct AuthenticationController {
         
         return registrationRespnse
     }
+    
+    func login(email: String, password: String) async throws -> Bool {
+        let loginResponse = try await httpClinet.login(email: email, password: password)
+        
+        print("accessToken: \(loginResponse.accessToken)")
+        print("refreshToken: \(loginResponse.refreshToken)")
+        
+        // save the access tokens on keychain
+        Keychain.set(loginResponse.accessToken, forKey: "accessToken")
+        Keychain.set(loginResponse.refreshToken, forKey: "refreshToken")
+        
+        return true
+    }
 }
 

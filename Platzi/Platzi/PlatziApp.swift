@@ -8,8 +8,11 @@ struct PlatziApp: App {
     
     var body: some Scene {
         WindowGroup {
-//            ContentView()
-            RegistrationScreen()
+            VStack {
+                RegistrationScreen()
+                LoginScreen()
+            }
+            
         }
     }
 }

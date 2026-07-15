@@ -42,9 +42,14 @@ struct RegistrationScreen: View {
                         Task { await register() }
                     }) {
                         Text("Register")
-                            .frame(maxWidth: .infinity, alignment: .center)
+                            .frame(maxWidth: .infinity)
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(registrationForm.isValid ? Color.blue : Color.gray)
+                            .cornerRadius(8)
                     }
                     .disabled(!registrationForm.isValid)
+                    .listRowBackground(Color.clear)
                 }
                 
                 if let messageText {
