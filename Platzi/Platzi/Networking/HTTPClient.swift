@@ -1,6 +1,7 @@
 import Foundation
 
 struct HTTPClient {
+    
     private let session: URLSession
     
     init() {
@@ -10,20 +11,22 @@ struct HTTPClient {
     }
     
     func load<T: Codable>(_ resource: Resource<T>) async throws -> T {
+        
         do {
-            return try await perfomeRequest(resource)
+            return try await performRequest(resource)
         } catch NetworkError.unauthorized {
             // attempt to refresh the token
             do {
                 try await refreshToken()
-                return try await perfomeRequest(resource)
+                return try await performRequest(resource)
             } catch {
-                NetworkError.unauthorized
+                throw NetworkError.unauthorized
             }
         }
     }
     
-    private func perfomeRequest<T: Codable>(_ resource: Resource<T>) async throws -> T {
+    private func performRequest<T: Codable>(_ resource: Resource<T>) async throws -> T {
+        
         var request = URLRequest(url: resource.url)
         
         switch resource.method {
@@ -47,7 +50,7 @@ struct HTTPClient {
         }
         
         if let headers = resource.headers {
-            for(key, value) in headers {
+            for (key, value) in headers {
                 request.setValue(value, forHTTPHeaderField: key)
             }
         }
@@ -76,48 +79,19 @@ struct HTTPClient {
         }
     }
     
-    func register(
-        name: String,
-        email: String,
-        password: String,
-        avatar: URL
-    ) async throws -> RegistrationResponse {
-        let registationRequest = RegistrationRequest(name: name, email: email, password: password, avatar: avatar)
+    func refreshToken() async throws {
         
-        var request = URLRequest(url: Constants.Urls.register)
-        request.httpMethod = "POST"
-        request.httpBody = try JSONEncoder().encode(registationRequest)
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        let (data, _) = try await URLSession.shared.data(for: request)
-        let registrationResponse = try JSONDecoder().decode(RegistrationResponse.self, from: data)
-        
-        return registrationResponse
-    }
-    
-    func login(email: String, password: String) async throws -> LoginResponse {
-        let loginRequest = LoginRequest(email: email, password: password)
-        
-        var request = URLRequest(url: Constants.Urls.login)
-        request.httpMethod = "POST"
-        request.httpBody = try JSONEncoder().encode(loginRequest)
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        let (data, _) = try await URLSession.shared.data(for: request)
-        let loginResponse = try JSONDecoder().decode(LoginResponse.self, from: data)
-        return loginResponse
-    }
-    
-    private func refreshToken() async throws {
         guard let refreshToken = Keychain<String>.get("refreshToken") else {
             throw NetworkError.unauthorized
         }
+        
         let body = try JSONEncoder().encode(["refreshToken": refreshToken])
         let resource = Resource(url: Constants.Urls.refreshToken, method: .post(body), modelType: RefreshTokenResponse.self)
         
-        let response = try await perfomeRequest(resource)
+        let response = try await performRequest(resource)
         
         Keychain.set(response.accessToken, forKey: "accessToken")
         Keychain.set(response.refreshToken, forKey: "refreshToken")
     }
 }
+

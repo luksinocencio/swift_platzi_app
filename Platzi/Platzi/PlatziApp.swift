@@ -2,15 +2,30 @@ import SwiftUI
 
 @main
 struct PlatziApp: App {
+    @AppStorage("isAuthenticated") private var isAuthenticated: Bool = false
+    @Environment(\.authenticationController) private var authenticationController
+    @State private var isLoading = true
+    
     init() {
         loadRocketSimConnect()
     }
     
     var body: some Scene {
         WindowGroup {
-            VStack {
-                RegistrationScreen()
-                LoginScreen()
+            ZStack {
+                if isLoading {
+                    ProgressView("Loading...")
+                        .task {
+                            isAuthenticated = await authenticationController.checkAuthentication()
+                            isLoading = false
+                        }
+                } else if isAuthenticated {
+                    HomeScreen()
+                } else {
+                    NavigationStack {
+                        LoginScreen()
+                    }
+                }
             }
             
         }

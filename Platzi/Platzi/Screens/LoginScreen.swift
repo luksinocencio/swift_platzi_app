@@ -48,6 +48,20 @@ struct LoginScreen: View {
                 .disabled(!isFormValid)
                 .listRowBackground(Color.clear)
             }
+            
+            Section {
+                NavigationLink {
+                    RegistrationScreen()
+                } label: {
+                    Text("Registration")
+                        .frame(maxWidth: .infinity)
+                        .foregroundColor(.white)
+                        .padding()
+                        .background(isFormValid ? Color.blue : Color.gray)
+                        .cornerRadius(8)
+                }
+                .listRowBackground(Color.clear)
+            }
         }
     }
 }
