@@ -7,7 +7,7 @@ struct HomeScreen: View {
         TabView {
             Tab {
                 NavigationStack {
-                    Text("CategoryListScreen")
+                    CategoryListScreen()
                 }
             } label: {
                 Label("Categories", systemImage: "square.grid.2x2")
@@ -34,4 +34,5 @@ struct HomeScreen: View {
 
 #Preview {
     HomeScreen()
+        .environment(PlatziStore(httpClient: HTTPClient()))
 }

@@ -3,6 +3,7 @@ import SwiftUI
 struct CategoryListScreen: View {
     @Environment(PlatziStore.self) private var store
     @State private var isLoading: Bool = false
+    @State private var showAddCategoryScreen: Bool = false
     
     private func loadCategories() async {
         defer { isLoading = false }
@@ -34,6 +35,18 @@ struct CategoryListScreen: View {
         .task {
             await loadCategories()
         }
+        .toolbar(content: {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Add Category") {
+                    showAddCategoryScreen = true
+                }
+            }
+        })
+        .sheet(isPresented: $showAddCategoryScreen, content: {
+            NavigationStack {
+                AddCategoryScreen()
+            }
+        })
         .navigationTitle("Categories")
     }
 }

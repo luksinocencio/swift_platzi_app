@@ -15,4 +15,16 @@ class PlatziStore {
         let resource = Resource(url: Constants.Urls.categories, modelType: [Category].self)
         categories = try await httpClient.load(resource)
     }
+    
+    func createCategory(name: String) async throws {
+        let createCategoryRequest = CreateCategoryRequest(name: name, image: URL.randomImageURL)
+        let resource = Resource(
+            url: Constants.Urls.createCategory,
+            method: .post(try createCategoryRequest.encode()),
+            modelType: Category.self
+        )
+        
+        let category = try await httpClient.load(resource)
+        categories.append(category)
+    }
 }

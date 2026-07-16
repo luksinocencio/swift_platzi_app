@@ -51,3 +51,8 @@ struct Category: Codable, Identifiable, Hashable {
     let image: URL
 }
 
+struct CreateCategoryRequest: Codable {
+    let name: String
+    let image: URL
+}
+
