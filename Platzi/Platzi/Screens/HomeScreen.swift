@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct HomeScreen: View {
-    @Environment(\.authenticationController) private var authenticationController
     
     var body: some View {
         TabView {
@@ -23,7 +22,7 @@ struct HomeScreen: View {
             
             Tab {
                 NavigationStack {
-                    Text("Profile")
+                    ProfileScreen()
                 }
             } label: {
                 Label("Profile", systemImage: "person.crop.circle")
