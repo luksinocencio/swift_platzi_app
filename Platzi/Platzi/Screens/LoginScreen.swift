@@ -2,24 +2,14 @@ import SwiftUI
 
 struct LoginScreen: View {
 
-    @State private var email: String = "johndoe@gmail.com"
-    @State private var password: String = "password1234"
-    @State private var isLoading: Bool = false
+    @State private var viewModel = LoginViewModel()
     @AppStorage(Constants.Keys.isAuthenticated) private var isAuthenticated: Bool = false
 
-    @Environment(\.authenticationController) private var authenticationController
     @Environment(ErrorState.self) private var errorState
 
-    private var isFormValid: Bool {
-        !email.isEmptyOrWhitespace && !password.isEmptyOrWhitespace
-    }
-
     private func login() async {
-        defer { isLoading = false }
-
         do {
-            isLoading = true
-            isAuthenticated = try await authenticationController.login(email: email, password: password)
+            isAuthenticated = try await viewModel.login()
         } catch {
             errorState.error = error
         }
@@ -63,7 +53,7 @@ struct LoginScreen: View {
     private var fields: some View {
         VStack(spacing: 12) {
             AuthField(icon: "envelope") {
-                TextField("Email", text: $email)
+                TextField("Email", text: $viewModel.email)
                     .keyboardType(.emailAddress)
                     .textContentType(.emailAddress)
                     .textInputAutocapitalization(.never)
@@ -71,7 +61,7 @@ struct LoginScreen: View {
             }
 
             AuthField(icon: "lock") {
-                SecureField("Password", text: $password)
+                SecureField("Password", text: $viewModel.password)
                     .textContentType(.password)
                     .textInputAutocapitalization(.never)
             }
@@ -83,7 +73,7 @@ struct LoginScreen: View {
             Task { await login() }
         } label: {
             Group {
-                if isLoading {
+                if viewModel.isLoading {
                     ProgressView()
                         .tint(.white)
                 } else {
@@ -95,7 +85,7 @@ struct LoginScreen: View {
         }
         .buttonStyle(.glassProminent)
         .controlSize(.large)
-        .disabled(!isFormValid || isLoading)
+        .disabled(!viewModel.isFormValid || viewModel.isLoading)
     }
 
     private var registrationLink: some View {

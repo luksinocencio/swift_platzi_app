@@ -22,7 +22,6 @@ struct PlatziApp: App {
                         }
                 } else if isAuthenticated {
                     HomeScreen()
-                        .environment(PlatziStore(httpClient: HTTPClient()))
                 } else {
                     NavigationStack {
                         LoginScreen()

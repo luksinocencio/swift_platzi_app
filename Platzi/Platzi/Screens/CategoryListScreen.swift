@@ -1,28 +1,25 @@
 import SwiftUI
 
 struct CategoryListScreen: View {
-    @Environment(PlatziStore.self) private var store
-    @Environment(ErrorState.self) private var errorState
-    @State private var isLoading: Bool = false
+    @State private var viewModel = CategoryListViewModel()
     @State private var showAddCategoryScreen: Bool = false
 
-    private func loadCategories() async {
-        defer { isLoading = false }
+    @Environment(ErrorState.self) private var errorState
 
+    private func loadCategories() async {
         do {
-            isLoading = true
-            try await store.loadCategories()
+            try await viewModel.loadCategories()
         } catch {
             errorState.error = error
         }
     }
-    
+
     var body: some View {
         ZStack {
-            if store.categories.isEmpty && !isLoading {
+            if viewModel.categories.isEmpty && !viewModel.isLoading {
                 ContentUnavailableView("No products available", systemImage: "shippingbox")
             } else {
-                List(store.categories) { category in
+                List(viewModel.categories) { category in
                     NavigationLink {
                         ProductListScreen(category: category)
                     } label: {
@@ -33,7 +30,7 @@ struct CategoryListScreen: View {
             }
         }
         .overlay(alignment: .center) {
-            if isLoading {
+            if viewModel.isLoading {
                 ProgressView("Loading...")
             }
         }
@@ -49,7 +46,9 @@ struct CategoryListScreen: View {
         })
         .sheet(isPresented: $showAddCategoryScreen, content: {
             NavigationStack {
-                AddCategoryScreen()
+                AddCategoryScreen { category in
+                    viewModel.add(category)
+                }
             }
             .globalErrorAlert()
         })
@@ -61,6 +60,5 @@ struct CategoryListScreen: View {
     NavigationStack {
         CategoryListScreen()
     }
-    .environment(PlatziStore(httpClient: HTTPClient()))
     .environment(ErrorState())
 }

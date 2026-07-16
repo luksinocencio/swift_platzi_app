@@ -1,36 +1,31 @@
 import SwiftUI
 
 struct AddCategoryScreen: View {
-    @State private var name: String = ""
-    @State private var isLoading: Bool = false
-    
-    @Environment(PlatziStore.self) private var store
+    @State private var viewModel = AddCategoryViewModel()
+
     @Environment(\.dismiss) private var dismiss
     @Environment(ErrorState.self) private var errorState
 
+    let onSave: (Category) -> Void
+
     private func createCategory() async {
-        defer { isLoading = false }
         do {
-            isLoading = true
-            try await store.createCategory(name: name)
+            let category = try await viewModel.createCategory()
+            onSave(category)
             dismiss()
         } catch {
             errorState.error = error
         }
     }
-    
-    private var isFormValid: Bool {
-        !name.isEmptyOrWhitespace
-    }
-    
+
     var body: some View {
         Form {
-            TextField("Name", text: $name)
+            TextField("Name", text: $viewModel.name)
         }.toolbar {
             ToolbarItem {
                 Button("Save") {
                     Task { await createCategory() }
-                }.disabled(!isFormValid || isLoading)
+                }.disabled(!viewModel.isFormValid || viewModel.isLoading)
             }
         }
         .navigationTitle("Add Category")
@@ -39,8 +34,7 @@ struct AddCategoryScreen: View {
 
 #Preview {
     NavigationStack {
-        AddCategoryScreen()
+        AddCategoryScreen(onSave: { _ in })
     }
-    .environment(PlatziStore(httpClient: HTTPClient()))
     .environment(ErrorState())
 }

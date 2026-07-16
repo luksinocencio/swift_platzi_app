@@ -1,53 +1,47 @@
 import Foundation
-import Observation
 
-@MainActor
-@Observable
-class PlatziStore {
+/// Stateless data layer for the Platzi API. ViewModels own the state;
+/// this service only performs requests and returns values.
+struct PlatziService {
     let httpClient: HTTPClient
-    var categories: [Category] = []
-    var locations: [Location] = []
-    
-    init(httpClient: HTTPClient) {
+
+    init(httpClient: HTTPClient = HTTPClient()) {
         self.httpClient = httpClient
     }
-    
-    func loadCategories() async throws {
+
+    func loadCategories() async throws -> [Category] {
         let resource = Resource(url: Constants.Urls.categories, modelType: [Category].self)
-        categories = try await httpClient.load(resource)
+        return try await httpClient.load(resource)
     }
-    
-    func createCategory(name: String) async throws {
+
+    func createCategory(name: String) async throws -> Category {
         let createCategoryRequest = CreateCategoryRequest(name: name, image: URL.randomImageURL)
         let resource = Resource(
             url: Constants.Urls.createCategory,
             method: .post(try createCategoryRequest.encode()),
             modelType: Category.self
         )
-        
-        let category = try await httpClient.load(resource)
-        categories.append(category)
+        return try await httpClient.load(resource)
     }
-    
+
     func fetchProductsBy(_ categoryId: Int) async throws -> [Product] {
         let resource = Resource(url: Constants.Urls.getProductsByCategory(categoryId), modelType: [Product].self)
         return try await httpClient.load(resource)
     }
-    
+
     func createProduct(title: String, price: Double, description: String, categoryId: Int, images: [URL]) async throws -> Product {
         let createProductRequest = CreateProductRequest(title: title, price: price, description: description, categoryId: categoryId, images: images)
         let resource = Resource(url: Constants.Urls.createProduct, method: .post(try createProductRequest.encode()), modelType: Product.self)
-        let product = try await httpClient.load(resource)
-        return product
+        return try await httpClient.load(resource)
     }
-    
+
     func deleteProduct(_ productId: Int) async throws -> Bool {
         let resource = Resource(url: Constants.Urls.deleteProduct(productId), method: .delete, modelType: Bool.self)
         return try await httpClient.load(resource)
     }
-    
-    func loadLocations() async throws {
+
+    func loadLocations() async throws -> [Location] {
         let resource = Resource(url: Constants.Urls.locations, modelType: [Location].self)
-        locations = try await httpClient.load(resource)
+        return try await httpClient.load(resource)
     }
 }

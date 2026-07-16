@@ -9,7 +9,8 @@ App iOS em SwiftUI que consome a [Platzi Fake Store API](https://api.escuelajs.c
 
 ## 1. Visão Geral
 
-- **Plataforma:** iOS, SwiftUI puro (sem UIKit, sem Storyboards).
+- **Plataforma:** iOS 26+, SwiftUI puro (sem UIKit, sem Storyboards); Liquid Glass disponível (`.buttonStyle(.glassProminent)`, `.glassEffect()`).
+- **Arquitetura:** **MVVM** — um ViewModel `@Observable` por tela com estado; camada de serviço stateless (`PlatziService`).
 - **Concorrência:** `async`/`await`. **Nunca usar Combine.**
 - **Observação de estado:** framework `Observation` (`@Observable`, `@Environment`), **não** `ObservableObject`/`@Published`.
 - **Idioma do código:** identificadores e strings de UI em inglês.
@@ -22,13 +23,14 @@ Autenticação (login/registro/refresh/logout), categorias, produtos (listar/cri
 
 ```
 Platzi/Platzi/
-├── PlatziApp.swift          # Entry point (@main), roteamento auth
-├── Controllers/             # Lógica de autenticação (AuthenticationController)
-├── Stores/                  # Estado observável da app (PlatziStore)
+├── PlatziApp.swift          # Entry point (@main), roteamento auth, ErrorState global
+├── Controllers/             # Serviço de autenticação (AuthenticationController)
+├── Services/                # Camada de dados stateless (PlatziService)
+├── ViewModels/              # Um ViewModel por tela com estado (sufixo *ViewModel)
 ├── Networking/              # HTTPClient, Resource, HTTPMethod
 ├── Models/                  # Modelos de domínio (Category, Product, Location)
 ├── DTOs/                    # Requests/responses da API (um arquivo por tipo)
-├── Errors/                  # NetworkError + LocalizedError
+├── Errors/                  # NetworkError, ErrorState + globalErrorAlert
 ├── Extensions/              # Extensões de tipos (String, URL, Environment, etc.)
 ├── Screens/                 # Telas (uma View por arquivo, sufixo *Screen)
 ├── Views/                   # Componentes reutilizáveis (sufixo *View / *CellView)
@@ -40,7 +42,9 @@ Platzi/Platzi/
 - Modelos de domínio (usados pelas views, `Identifiable`) → `Models/`, um arquivo por tipo.
 - Requests/responses da API (`*Request`, `*Response`) → `DTOs/`, um arquivo por tipo.
 - Telas → `Screens/` com sufixo `Screen`; componentes reutilizáveis → `Views/`.
-- Chamadas de rede novas → método no `PlatziStore` (domínio) ou `AuthenticationController` (auth).
+- Estado e lógica de tela → `ViewModels/` com sufixo `ViewModel`.
+- Chamadas de rede novas → método no `PlatziService` (domínio) ou `AuthenticationController` (auth); ViewModels chamam o serviço, nunca o `HTTPClient` direto.
+- Telas puramente apresentacionais (ex.: `ProductDetailScreen`, `LocationDetailScreen`) não precisam de ViewModel.
 
 ## 3. Camada de Rede
 
@@ -71,33 +75,53 @@ struct Resource<T: Codable> {
    static func deleteProduct(_ id: Int) -> URL { URL(string: "...\(id)")! }
    ```
 2. Crie DTOs Codable de request/response em `DTOs/` (um arquivo por tipo).
-3. Adicione um método no `PlatziStore` (dados de domínio) ou `AuthenticationController` (auth):
+3. Adicione um método **stateless** no `PlatziService` (dados de domínio) ou `AuthenticationController` (auth), retornando o valor:
    ```swift
-   func loadCategories() async throws {
+   func loadCategories() async throws -> [Category] {
        let resource = Resource(url: Constants.Urls.categories, modelType: [Category].self)
-       categories = try await httpClient.load(resource)
+       return try await httpClient.load(resource)
    }
    ```
 4. Para POST/PUT, codifique o body com o helper `.encode()`:
    ```swift
    let resource = Resource(url: ..., method: .post(try request.encode()), modelType: Product.self)
    ```
+5. Exponha o dado no ViewModel da tela, que guarda o estado.
 
-## 4. Estado & Injeção de Dependências
+## 4. MVVM — ViewModels & Injeção de Dependências
 
-### `PlatziStore` — estado de domínio
+### ViewModel (um por tela com estado)
 ```swift
 @MainActor
 @Observable
-class PlatziStore {
-    let httpClient: HTTPClient
+class CategoryListViewModel {
     var categories: [Category] = []
-    var locations: [Location] = []
-    init(httpClient: HTTPClient) { self.httpClient = httpClient }
+    var isLoading: Bool = false
+
+    private let service: PlatziService
+
+    init(service: PlatziService = PlatziService()) {
+        self.service = service
+    }
+
+    func loadCategories() async throws {
+        isLoading = true
+        defer { isLoading = false }
+        categories = try await service.loadCategories()
+    }
 }
 ```
-- Injetado via `.environment(PlatziStore(httpClient: HTTPClient()))`.
-- Consumido nas telas com `@Environment(PlatziStore.self) private var store`.
+Regras:
+- `@MainActor @Observable class`, sufixo `ViewModel`, em `ViewModels/`.
+- Estado da tela (`isLoading`, listas, campos de formulário, `isFormValid`) vive no ViewModel.
+- Dependências (`PlatziService`, `AuthenticationController`) injetadas no `init` com default — permite mock em testes.
+- Métodos assíncronos **lançam** (`throws`); quem captura é a tela, roteando para o `ErrorState`.
+- Criado na tela com `@State private var viewModel = XViewModel()`; se precisar de parâmetro, use `init` na tela com `_viewModel = State(initialValue: XViewModel(...))`.
+- Bindings de formulário direto no VM: `TextField("Title", text: $viewModel.title)`.
+- Dados criados em telas modais voltam por closure `onSave: (T) -> Void` e são inseridos no VM da tela pai (ex.: `viewModel.add(category)`).
+
+### `PlatziService` — camada de dados
+`struct` stateless em `Services/`; recebe `HTTPClient` no `init` (default). Só faz requisições e retorna valores — nunca guarda estado.
 
 ### `AuthenticationController`
 - `struct` com `HTTPClient`; injetado via `EnvironmentValues` usando `@Entry`:
@@ -126,16 +150,14 @@ Padrão consistente em todas as `*Screen`:
 
 ```swift
 struct ExampleScreen: View {
-    @Environment(PlatziStore.self) private var store
-    @Environment(ErrorState.self) private var errorState
-    @State private var isLoading: Bool = false
+    @State private var viewModel = ExampleViewModel()
     @State private var showSheet: Bool = false
 
+    @Environment(ErrorState.self) private var errorState
+
     private func loadData() async {
-        defer { isLoading = false }
         do {
-            isLoading = true
-            try await store.loadCategories()
+            try await viewModel.loadItems()
         } catch {
             errorState.error = error
         }
@@ -143,17 +165,17 @@ struct ExampleScreen: View {
 
     var body: some View {
         ZStack {
-            if store.categories.isEmpty && !isLoading {
+            if viewModel.items.isEmpty && !viewModel.isLoading {
                 ContentUnavailableView("No items", systemImage: "shippingbox")
             } else {
-                List(store.categories) { item in
+                List(viewModel.items) { item in
                     NavigationLink { DetailScreen(item: item) } label: {
                         CellView(item: item)
                     }
                 }
             }
         }
-        .overlay(alignment: .center) { if isLoading { ProgressView("Loading...") } }
+        .overlay(alignment: .center) { if viewModel.isLoading { ProgressView("Loading...") } }
         .task { await loadData() }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -161,8 +183,10 @@ struct ExampleScreen: View {
             }
         }
         .sheet(isPresented: $showSheet) {
-            NavigationStack { AddScreen() }
-                .globalErrorAlert()
+            NavigationStack {
+                AddScreen { viewModel.add($0) }
+            }
+            .globalErrorAlert()
         }
         .navigationTitle("Title")
     }
@@ -170,31 +194,32 @@ struct ExampleScreen: View {
 
 #Preview {
     NavigationStack { ExampleScreen() }
-        .environment(PlatziStore(httpClient: HTTPClient()))
         .environment(ErrorState())
 }
 ```
 
 ### Padrões-chave
-- **Loading:** `@State private var isLoading` + `ProgressView` em `.overlay` + `defer { isLoading = false }`.
+- **Loading:** `isLoading` no ViewModel (com `defer { isLoading = false }`); tela mostra `ProgressView` em `.overlay`.
 - **Carregamento:** `.task { await load() }`; pull-to-refresh via `.refreshable`.
 - **Estado vazio:** `ContentUnavailableView`.
-- **Erros:** no `catch`, atribuir `errorState.error = error` (alert global via `ErrorState`). Nunca engolir erros com `print`.
+- **Erros:** VM lança; a tela captura no `catch` e atribui `errorState.error = error` (alert global via `ErrorState`). Nunca engolir erros com `print`.
 - **Navegação:** `NavigationStack` + `NavigationLink`; modais via `.sheet` sempre envoltos em `NavigationStack`.
 - **Chamar async de callbacks síncronos:** `Button("Save") { Task { await save() } }`.
-- **Callbacks entre telas:** closures `let onSave: (Product) -> Void` passados no `init`.
+- **Callbacks entre telas:** closures `let onSave: (Product) -> Void` passados no `init`; a tela pai insere no seu VM.
 - **Toolbar:** `ToolbarItem(placement: .topBarTrailing)`.
-- **Preview:** **sempre** incluir `#Preview` injetando `.environment(PlatziStore(httpClient: HTTPClient()))` quando a tela usa o store e `.environment(ErrorState())` quando usa o error state.
+- **Preview:** **sempre** incluir `#Preview` injetando `.environment(ErrorState())` quando a tela usa o error state.
 - **`.task`:** nunca aninhar `Task { }` dentro de `.task { }` — chame `await` direto (preserva cancelamento automático).
+- **Botões primários:** `.buttonStyle(.glassProminent)` + `.controlSize(.large)` (Liquid Glass); campos de auth usam o componente `AuthField`.
 
 ### Componentes de UI reutilizáveis
 - `CategoryCellView`, `ProductCellView` — células de lista com `AsyncImage`.
 - `ImagePlaceHolderView` — placeholder de imagem (usado no `placeholder:` do `AsyncImage`).
 - `ValidationSummaryView` — lista de erros de validação em vermelho.
+- `AuthField` — campo com ícone e fundo arredondado, usado nas telas de auth.
 
 ### Validação de formulário
-- Propriedade computada `private var isFormValid: Bool`.
-- Botão de submit com `.disabled(!isFormValid)`.
+- Propriedade computada `isFormValid: Bool` **no ViewModel**.
+- Botão de submit com `.disabled(!viewModel.isFormValid || viewModel.isLoading)`.
 - Helpers em `String+Extensions`: `isEmptyOrWhitespace`, `isValidPassword`, `isEmail`.
 
 ## 6. Models e DTOs
@@ -234,10 +259,11 @@ Ao criar novos erros, siga o mesmo padrão: `enum` de erro + extensão `Localize
 
 1. [ ] URL adicionada em `Constants.Urls`.
 2. [ ] Request/response em `DTOs/`; modelo de domínio em `Models/` (com `CodingKeys` se snake_case).
-3. [ ] Método de rede em `PlatziStore` (domínio) ou `AuthenticationController` (auth).
-4. [ ] Tela em `Screens/` com sufixo `Screen`; componentes em `Views/`.
-5. [ ] Estados de loading (`ProgressView`) e vazio (`ContentUnavailableView`).
-6. [ ] Carregamento via `.task` (sem `Task` aninhado); validação via `isFormValid` + `.disabled`.
-7. [ ] `#Preview` com `.environment(PlatziStore(...))` e `.environment(ErrorState())` quando aplicável.
-8. [ ] Erros no `catch` → `errorState.error = error`; usar `NetworkError`/`LocalizedError` para novos erros; sem `print` de erros ou tokens.
-9. [ ] Build via `BuildProject`; validação rápida via `XcodeRefreshCodeIssuesInFile`.
+3. [ ] Método stateless em `PlatziService` (domínio) ou `AuthenticationController` (auth), retornando valor.
+4. [ ] ViewModel em `ViewModels/` (`@MainActor @Observable`, DI via `init` com default, métodos `throws`).
+5. [ ] Tela em `Screens/` com sufixo `Screen` consumindo o VM; componentes em `Views/`.
+6. [ ] Estados de loading (`ProgressView`) e vazio (`ContentUnavailableView`).
+7. [ ] Carregamento via `.task` (sem `Task` aninhado); validação via `viewModel.isFormValid` + `.disabled`.
+8. [ ] `#Preview` com `.environment(ErrorState())` quando aplicável.
+9. [ ] Erros no `catch` da tela → `errorState.error = error`; usar `NetworkError`/`LocalizedError` para novos erros; sem `print` de erros ou tokens.
+10. [ ] Build via `BuildProject`; validação rápida via `XcodeRefreshCodeIssuesInFile`.

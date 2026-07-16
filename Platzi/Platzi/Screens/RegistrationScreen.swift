@@ -2,24 +2,13 @@ import SwiftUI
 
 struct RegistrationScreen: View {
 
-    @Environment(\.authenticationController) private var authenticationController
+    @State private var viewModel = RegistrationViewModel()
+
     @Environment(ErrorState.self) private var errorState
 
-    @State private var registrationForm = RegistrationForm()
-    @State private var successMessage: String?
-    @State private var isLoading: Bool = false
-
     private func register() async {
-        defer { isLoading = false }
-
         do {
-            isLoading = true
-            let response = try await authenticationController.register(
-                name: registrationForm.name,
-                email: registrationForm.email,
-                password: registrationForm.password
-            )
-            successMessage = "Registration for user \(response.name) is completed."
+            try await viewModel.register()
         } catch {
             errorState.error = error
         }
@@ -31,12 +20,12 @@ struct RegistrationScreen: View {
                 header
                 fields
 
-                let validationErrors = registrationForm.validate()
+                let validationErrors = viewModel.validate()
                 if !validationErrors.isEmpty {
                     ValidationSummaryView(errors: validationErrors)
                 }
 
-                if let successMessage {
+                if let successMessage = viewModel.successMessage {
                     successBanner(successMessage)
                 }
 
@@ -74,13 +63,13 @@ struct RegistrationScreen: View {
     private var fields: some View {
         VStack(spacing: 12) {
             AuthField(icon: "person") {
-                TextField("Name", text: $registrationForm.name)
+                TextField("Name", text: $viewModel.name)
                     .textContentType(.name)
                     .textInputAutocapitalization(.words)
             }
 
             AuthField(icon: "envelope") {
-                TextField("Email", text: $registrationForm.email)
+                TextField("Email", text: $viewModel.email)
                     .keyboardType(.emailAddress)
                     .textContentType(.emailAddress)
                     .textInputAutocapitalization(.never)
@@ -88,7 +77,7 @@ struct RegistrationScreen: View {
             }
 
             AuthField(icon: "lock") {
-                SecureField("Password", text: $registrationForm.password)
+                SecureField("Password", text: $viewModel.password)
                     .textContentType(.newPassword)
                     .textInputAutocapitalization(.never)
             }
@@ -100,7 +89,7 @@ struct RegistrationScreen: View {
             Task { await register() }
         } label: {
             Group {
-                if isLoading {
+                if viewModel.isLoading {
                     ProgressView()
                         .tint(.white)
                 } else {
@@ -112,7 +101,7 @@ struct RegistrationScreen: View {
         }
         .buttonStyle(.glassProminent)
         .controlSize(.large)
-        .disabled(!registrationForm.isValid || isLoading)
+        .disabled(!viewModel.isFormValid || viewModel.isLoading)
     }
 
     private func successBanner(_ message: String) -> some View {
@@ -127,45 +116,6 @@ struct RegistrationScreen: View {
         .background(Color.green.opacity(0.1))
         .cornerRadius(8)
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-extension RegistrationScreen {
-    private struct RegistrationForm {
-        var name: String = "John Doe"
-        var email: String = "johndoe@gmail.com"
-        var password: String = "password1234"
-
-        var isValid: Bool {
-            validate().isEmpty
-        }
-
-        func validate() -> [String] {
-
-            var errors: [String] = []
-
-            if name.isEmptyOrWhitespace {
-                errors.append("Name cannot be empty.")
-            }
-
-            if email.isEmptyOrWhitespace {
-                errors.append("Email cannot be empty.")
-            }
-
-            if password.isEmptyOrWhitespace {
-                errors.append("Password cannot be empty.")
-            }
-
-            if !password.isValidPassword {
-                errors.append("Password must be at least 8 characters long.")
-            }
-
-            if !email.isEmail {
-                errors.append("Email must be in correct format.")
-            }
-
-            return errors
-        }
     }
 }
 

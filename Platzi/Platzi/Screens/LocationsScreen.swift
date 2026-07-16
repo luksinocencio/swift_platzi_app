@@ -2,26 +2,15 @@ import SwiftUI
 import MapKit
 
 struct LocationsScreen: View {
+    @State private var viewModel = LocationsViewModel()
     @State private var cameraPosition = MapCameraPosition.region(.defaultRegion)
-    @Environment(PlatziStore.self) private var store
-    @Environment(ErrorState.self) private var errorState
     @State private var selectedLocation: Location?
-    
-    private func regionThatFits(_ coordinates: [CLLocationCoordinate2D]) -> MKCoordinateRegion? {
-        guard !coordinates.isEmpty else { return nil }
-        
-        let mapRect = coordinates.reduce(MKMapRect.null) { rect, coord in
-            let point = MKMapPoint(coord)
-            let pointRect = MKMapRect(origin: point, size: MKMapSize(width: 0, height: 0))
-            return rect.union(pointRect)
-        }
-        
-        return MKCoordinateRegion(mapRect)
-    }
-    
+
+    @Environment(ErrorState.self) private var errorState
+
     var body: some View {
         Map(position: $cameraPosition) {
-            ForEach(store.locations) { location in
+            ForEach(viewModel.locations) { location in
                 Annotation(location.name, coordinate: location.coordinate) {
                     Image(systemName: "mappin.circle.fill")
                         .font(selectedLocation?.id == location.id ? .largeTitle : .title)
@@ -40,13 +29,11 @@ struct LocationsScreen: View {
         })
         .task {
             do {
-                try await store.loadLocations()
-                
-                let coordinates = store.locations.map { $0.coordinate }
-                if let region = regionThatFits(coordinates) {
+                try await viewModel.loadLocations()
+
+                if let region = viewModel.regionThatFitsAllLocations() {
                     cameraPosition = .region(region)
                 }
-                
             } catch {
                 errorState.error = error
             }
@@ -56,6 +43,5 @@ struct LocationsScreen: View {
 
 #Preview {
     LocationsScreen()
-        .environment(PlatziStore(httpClient: HTTPClient()))
         .environment(ErrorState())
 }

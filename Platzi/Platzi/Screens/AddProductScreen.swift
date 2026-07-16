@@ -1,63 +1,47 @@
 import SwiftUI
 
 struct AddProductScreen: View {
-    @State private var title: String = ""
-    @State private var price: Double?
-    @State private var description: String = ""
+    @State private var viewModel: AddProductViewModel
+
     @Environment(\.dismiss) private var dismiss
-    @Environment(PlatziStore.self) private var store
     @Environment(ErrorState.self) private var errorState
-    
-    @State private var selectedCategoryId: Int
-    
+
     let onSave: (Product) -> Void
-    
+
     init(selectedCategory: Int, onSave: @escaping (Product) -> Void) {
-        self.selectedCategoryId = selectedCategory
+        _viewModel = State(initialValue: AddProductViewModel(selectedCategoryId: selectedCategory))
         self.onSave = onSave
     }
-    
-    private var isFormValid: Bool {
-        !title.isEmptyOrWhitespace && !description.isEmptyOrWhitespace && price != nil && price! > 0
-    }
-    
+
     private func saveProduct() async {
-        guard let price else { return }
-        
         do {
-            let newProduct = try await store.createProduct(
-                title: title,
-                price: price,
-                description: description,
-                categoryId: selectedCategoryId,
-                images: [URL.randomImageURL]
-            )
-            onSave(newProduct)
+            guard let product = try await viewModel.saveProduct() else { return }
+            onSave(product)
             dismiss()
         } catch {
             errorState.error = error
         }
     }
-    
+
     var body: some View {
         Form {
-            Picker("Select a category", selection: $selectedCategoryId) {
-                ForEach(store.categories) { category in
+            Picker("Select a category", selection: $viewModel.selectedCategoryId) {
+                ForEach(viewModel.categories) { category in
                     Text(category.name)
                         .tag(category.id)
                 }
             }.pickerStyle(.automatic)
-            
-            TextField("Title", text: $title)
-            TextField("Price", value: $price, format: .number)
+
+            TextField("Title", text: $viewModel.title)
+            TextField("Price", value: $viewModel.price, format: .number)
                 .keyboardType(.decimalPad)
-            TextEditor(text: $description)
+            TextEditor(text: $viewModel.description)
                 .frame(height: 100)
-            
+
         }
         .task {
             do {
-                try await store.loadCategories()
+                try await viewModel.loadCategories()
             } catch {
                 errorState.error = error
             }
@@ -68,11 +52,11 @@ struct AddProductScreen: View {
                     dismiss()
                 }
             }
-            
+
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Save Product") {
                     Task { await saveProduct() }
-                }.disabled(!isFormValid)
+                }.disabled(!viewModel.isFormValid || viewModel.isLoading)
             }
         })
         .navigationTitle("Add Product")
@@ -84,6 +68,5 @@ struct AddProductScreen: View {
     NavigationStack {
         AddProductScreen(selectedCategory: 87, onSave: { _ in })
     }
-    .environment(PlatziStore(httpClient: HTTPClient()))
     .environment(ErrorState())
 }

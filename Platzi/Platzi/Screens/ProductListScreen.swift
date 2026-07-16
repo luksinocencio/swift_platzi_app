@@ -1,70 +1,60 @@
 import SwiftUI
 
 struct ProductListScreen: View {
-    let category: Category
-    
-    @Environment(PlatziStore.self) private var store
-    @Environment(ErrorState.self) private var errorState
-    @State private var products: [Product] = []
-    @State private var isLoading: Bool = false
+    @State private var viewModel: ProductListViewModel
     @State private var showAddProductScreen: Bool = false
 
+    @Environment(ErrorState.self) private var errorState
+
+    init(category: Category) {
+        _viewModel = State(initialValue: ProductListViewModel(category: category))
+    }
+
     private func loadProducts() async {
-        guard !isLoading else { return }
-
-        isLoading = true
-        defer { isLoading = false }
-
         do {
-            products = try await store.fetchProductsBy(category.id)
+            try await viewModel.loadProducts()
         } catch {
             errorState.error = error
         }
     }
 
-    private func deleteProduct(_ indexSet: IndexSet) {
-        indexSet.forEach { index in
-            let product = products[index]
-            Task {
-                do {
-                    let isDeleted = try await store.deleteProduct(product.id)
-                    if isDeleted {
-                        products.remove(atOffsets: indexSet)
-                    }
-                } catch {
-                    errorState.error = error
-                }
+    private func deleteProducts(_ indexSet: IndexSet) {
+        Task {
+            do {
+                try await viewModel.deleteProducts(at: indexSet)
+            } catch {
+                errorState.error = error
             }
         }
     }
-    
+
     var body: some View {
         ZStack {
-            if products.isEmpty && !isLoading {
+            if viewModel.products.isEmpty && !viewModel.isLoading {
                 ContentUnavailableView("No products available", systemImage: "shippingbox")
             } else {
                 List {
-                    ForEach(products) { product in
+                    ForEach(viewModel.products) { product in
                         NavigationLink {
                             ProductDetailScreen(product: product)
                         } label: {
                             ProductCellView(product: product)
                         }
-                    }.onDelete(perform: deleteProduct)
+                    }.onDelete(perform: deleteProducts)
                 }.refreshable {
                     await loadProducts()
                 }
             }
         }
         .overlay(alignment: .center) {
-            if isLoading {
+            if viewModel.isLoading {
                 ProgressView("Loading...")
             }
         }
         .sheet(isPresented: $showAddProductScreen, content: {
             NavigationStack {
-                AddProductScreen(selectedCategory: category.id) { product in
-                    products.append(product)
+                AddProductScreen(selectedCategory: viewModel.category.id) { product in
+                    viewModel.add(product)
                 }
             }
             .globalErrorAlert()
@@ -79,13 +69,13 @@ struct ProductListScreen: View {
         .task {
             await loadProducts()
         }
-        .navigationTitle(category.name)
+        .navigationTitle(viewModel.category.name)
     }
 }
 
 struct ProductCellView: View {
     let product: Product
-    
+
     var body: some View {
         HStack {
             AsyncImage(url: product.images.first) { img in
@@ -105,6 +95,5 @@ struct ProductCellView: View {
     NavigationStack {
         ProductListScreen(category: .init(id: 79, name: "Shoes", image: URL.randomImageURL))
     }
-    .environment(PlatziStore(httpClient: HTTPClient()))
     .environment(ErrorState())
 }

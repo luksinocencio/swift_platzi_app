@@ -33,5 +33,5 @@ struct HomeScreen: View {
 
 #Preview {
     HomeScreen()
-        .environment(PlatziStore(httpClient: HTTPClient()))
+        .environment(ErrorState())
 }
