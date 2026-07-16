@@ -8,7 +8,9 @@ struct Constants {
         static let categories = URL(string: "https://api.escuelajs.co/api/v1/categories")!
         static let createCategory = URL(string: "https://api.escuelajs.co/api/v1/categories/")!
         static let createProduct = URL(string: "https://api.escuelajs.co/api/v1/products/")!
-        
+        static func deleteProduct(_ productId: Int) -> URL {
+            URL(string: "https://api.escuelajs.co/api/v1/products/\(productId)")!
+        }
         
         static func getProductsByCategory(_ categoryId: Int) -> URL {
             URL(string: "https://api.escuelajs.co/api/v1/categories/\(categoryId)/products")!
