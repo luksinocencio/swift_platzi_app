@@ -27,7 +27,11 @@ struct ProductListScreen: View {
                 ContentUnavailableView("No products available", systemImage: "shippingbox")
             } else {
                 List(products) { product in
-                    ProductCellView(product: product)
+                    NavigationLink {
+                        ProductDetailScreen(product: product)
+                    } label: {
+                        ProductCellView(product: product)
+                    }
                 }.refreshable {
                     await loadProducts()
                 }
