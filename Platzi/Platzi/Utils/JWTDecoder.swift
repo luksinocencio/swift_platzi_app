@@ -6,9 +6,7 @@ struct JWTDecoder {
               let exp = payload["exp"] as? TimeInterval else {
             return true
         }
-        
-        print(payload)
-        print(exp)
+
         return Date().timeIntervalSince1970 > exp
     }
     

@@ -2,9 +2,10 @@ import SwiftUI
 
 @main
 struct PlatziApp: App {
-    @AppStorage("isAuthenticated") private var isAuthenticated: Bool = false
+    @AppStorage(Constants.Keys.isAuthenticated) private var isAuthenticated: Bool = false
     @Environment(\.authenticationController) private var authenticationController
     @State private var isLoading = true
+    @State private var errorState = ErrorState()
     
     init() {
         loadRocketSimConnect()
@@ -28,7 +29,8 @@ struct PlatziApp: App {
                     }
                 }
             }
-            
+            .globalErrorAlert()
+            .environment(errorState)
         }
     }
 }

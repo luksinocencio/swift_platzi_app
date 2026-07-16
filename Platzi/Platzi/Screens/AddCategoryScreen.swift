@@ -6,7 +6,8 @@ struct AddCategoryScreen: View {
     
     @Environment(PlatziStore.self) private var store
     @Environment(\.dismiss) private var dismiss
-    
+    @Environment(ErrorState.self) private var errorState
+
     private func createCategory() async {
         defer { isLoading = false }
         do {
@@ -14,7 +15,7 @@ struct AddCategoryScreen: View {
             try await store.createCategory(name: name)
             dismiss()
         } catch {
-            print(error.localizedDescription)
+            errorState.error = error
         }
     }
     
@@ -39,5 +40,7 @@ struct AddCategoryScreen: View {
 #Preview {
     NavigationStack {
         AddCategoryScreen()
-    }.environment(PlatziStore(httpClient: HTTPClient()))
+    }
+    .environment(PlatziStore(httpClient: HTTPClient()))
+    .environment(ErrorState())
 }

@@ -45,7 +45,7 @@ struct HTTPClient {
         }
         
         // add authorization header // accessToken
-        if let token = Keychain<String>.get("accessToken") {
+        if let token = Keychain<String>.get(Constants.Keys.accessToken) {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         
@@ -81,7 +81,7 @@ struct HTTPClient {
     
     func refreshToken() async throws {
         
-        guard let refreshToken = Keychain<String>.get("refreshToken") else {
+        guard let refreshToken = Keychain<String>.get(Constants.Keys.refreshToken) else {
             throw NetworkError.unauthorized
         }
         
@@ -90,8 +90,8 @@ struct HTTPClient {
         
         let response = try await performRequest(resource)
         
-        Keychain.set(response.accessToken, forKey: "accessToken")
-        Keychain.set(response.refreshToken, forKey: "refreshToken")
+        Keychain.set(response.accessToken, forKey: Constants.Keys.accessToken)
+        Keychain.set(response.refreshToken, forKey: Constants.Keys.refreshToken)
     }
 }
 

@@ -4,31 +4,35 @@ struct ProductListScreen: View {
     let category: Category
     
     @Environment(PlatziStore.self) private var store
+    @Environment(ErrorState.self) private var errorState
     @State private var products: [Product] = []
     @State private var isLoading: Bool = false
     @State private var showAddProductScreen: Bool = false
-    
+
     private func loadProducts() async {
         guard !isLoading else { return }
-        
+
         isLoading = true
         defer { isLoading = false }
-        
+
         do {
             products = try await store.fetchProductsBy(category.id)
-            print(products)
         } catch {
-            print(error.localizedDescription)
+            errorState.error = error
         }
     }
-    
+
     private func deleteProduct(_ indexSet: IndexSet) {
         indexSet.forEach { index in
             let product = products[index]
             Task {
-                let isDeleted = try await store.deleteProduct(product.id)
-                if isDeleted {
-                    products.remove(atOffsets: indexSet)
+                do {
+                    let isDeleted = try await store.deleteProduct(product.id)
+                    if isDeleted {
+                        products.remove(atOffsets: indexSet)
+                    }
+                } catch {
+                    errorState.error = error
                 }
             }
         }
@@ -63,6 +67,7 @@ struct ProductListScreen: View {
                     products.append(product)
                 }
             }
+            .globalErrorAlert()
         })
         .toolbar(content: {
             ToolbarItem {
@@ -72,7 +77,7 @@ struct ProductListScreen: View {
             }
         })
         .task {
-            Task { await loadProducts() }
+            await loadProducts()
         }
         .navigationTitle(category.name)
     }
@@ -99,5 +104,7 @@ struct ProductCellView: View {
 #Preview {
     NavigationStack {
         ProductListScreen(category: .init(id: 79, name: "Shoes", image: URL.randomImageURL))
-    }.environment(PlatziStore(httpClient: HTTPClient()))
+    }
+    .environment(PlatziStore(httpClient: HTTPClient()))
+    .environment(ErrorState())
 }

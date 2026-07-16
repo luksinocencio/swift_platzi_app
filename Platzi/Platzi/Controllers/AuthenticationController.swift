@@ -4,7 +4,7 @@ struct AuthenticationController {
     let httpClient: HTTPClient
     
     func checkAuthentication() async -> Bool {
-        guard let accessToken: String = Keychain.get("accessToken") else {
+        guard let accessToken: String = Keychain.get(Constants.Keys.accessToken) else {
             return false
         }
         
@@ -25,13 +25,10 @@ struct AuthenticationController {
         let request = LoginRequest(email: email, password: password)
         let resource = Resource(url: Constants.Urls.login, method: .post(try request.encode()), modelType: LoginResponse.self)
         let response = try await httpClient.load(resource)
-        
-        print(response.accessToken)
-        print(response.refreshToken)
-        
+
         // save the access and refresh token in Keychain
-        Keychain.set(response.accessToken, forKey: "accessToken")
-        Keychain.set(response.refreshToken, forKey: "refreshToken")
+        Keychain.set(response.accessToken, forKey: Constants.Keys.accessToken)
+        Keychain.set(response.refreshToken, forKey: Constants.Keys.refreshToken)
         
         return true
     }
@@ -44,9 +41,9 @@ struct AuthenticationController {
     }
     
     func signOut() {
-        UserDefaults.standard.removeObject(forKey: "isAuthenticated")
-        let _ = Keychain<String>.delete("accessToken")
-        let _ = Keychain<String>.delete("refreshToken")
+        UserDefaults.standard.removeObject(forKey: Constants.Keys.isAuthenticated)
+        let _ = Keychain<String>.delete(Constants.Keys.accessToken)
+        let _ = Keychain<String>.delete(Constants.Keys.refreshToken)
     }
 }
 

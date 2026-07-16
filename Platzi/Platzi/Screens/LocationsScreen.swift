@@ -4,6 +4,7 @@ import MapKit
 struct LocationsScreen: View {
     @State private var cameraPosition = MapCameraPosition.region(.defaultRegion)
     @Environment(PlatziStore.self) private var store
+    @Environment(ErrorState.self) private var errorState
     @State private var selectedLocation: Location?
     
     private func regionThatFits(_ coordinates: [CLLocationCoordinate2D]) -> MKCoordinateRegion? {
@@ -47,7 +48,7 @@ struct LocationsScreen: View {
                 }
                 
             } catch {
-                print(error.localizedDescription)
+                errorState.error = error
             }
         }
     }
@@ -56,4 +57,5 @@ struct LocationsScreen: View {
 #Preview {
     LocationsScreen()
         .environment(PlatziStore(httpClient: HTTPClient()))
+        .environment(ErrorState())
 }

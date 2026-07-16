@@ -6,6 +6,7 @@ struct AddProductScreen: View {
     @State private var description: String = ""
     @Environment(\.dismiss) private var dismiss
     @Environment(PlatziStore.self) private var store
+    @Environment(ErrorState.self) private var errorState
     
     @State private var selectedCategoryId: Int
     
@@ -34,7 +35,7 @@ struct AddProductScreen: View {
             onSave(newProduct)
             dismiss()
         } catch {
-            print(error.localizedDescription)
+            errorState.error = error
         }
     }
     
@@ -58,7 +59,7 @@ struct AddProductScreen: View {
             do {
                 try await store.loadCategories()
             } catch {
-                print(error.localizedDescription)
+                errorState.error = error
             }
         }
         .toolbar(content: {
@@ -82,5 +83,7 @@ struct AddProductScreen: View {
 #Preview {
     NavigationStack {
         AddProductScreen(selectedCategory: 87, onSave: { _ in })
-    }.environment(PlatziStore(httpClient: HTTPClient()))
+    }
+    .environment(PlatziStore(httpClient: HTTPClient()))
+    .environment(ErrorState())
 }

@@ -1,71 +1,116 @@
 import SwiftUI
 
 struct LoginScreen: View {
-    
+
     @State private var email: String = "johndoe@gmail.com"
     @State private var password: String = "password1234"
-    @AppStorage("isAuthenticated") private var isAuthenticated: Bool = false
-    
+    @State private var isLoading: Bool = false
+    @AppStorage(Constants.Keys.isAuthenticated) private var isAuthenticated: Bool = false
+
     @Environment(\.authenticationController) private var authenticationController
-    
+    @Environment(ErrorState.self) private var errorState
+
     private var isFormValid: Bool {
         !email.isEmptyOrWhitespace && !password.isEmptyOrWhitespace
     }
-    
+
     private func login() async {
+        defer { isLoading = false }
+
         do {
+            isLoading = true
             isAuthenticated = try await authenticationController.login(email: email, password: password)
-            print(isAuthenticated)
         } catch {
-            print(error.localizedDescription)
+            errorState.error = error
         }
     }
-    
+
     var body: some View {
-        Form {
-            Section(header: Text("Welcome Back").font(.headline).foregroundColor(.blue)) {
+        ScrollView {
+            VStack(spacing: 32) {
+                header
+                fields
+                loginButton
+                registrationLink
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 48)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+    }
+
+    private var header: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "bag.fill")
+                .font(.system(size: 40))
+                .foregroundStyle(.white)
+                .frame(width: 88, height: 88)
+                .background(
+                    LinearGradient(colors: [.blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing),
+                    in: .rect(cornerRadius: 22, style: .continuous)
+                )
+
+            VStack(spacing: 4) {
+                Text("Welcome Back")
+                    .font(.largeTitle.bold())
+                Text("Sign in to continue shopping")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var fields: some View {
+        VStack(spacing: 12) {
+            AuthField(icon: "envelope") {
                 TextField("Email", text: $email)
                     .keyboardType(.emailAddress)
+                    .textContentType(.emailAddress)
                     .textInputAutocapitalization(.never)
-                    .foregroundColor(.primary)
-                
+                    .autocorrectionDisabled()
+            }
+
+            AuthField(icon: "lock") {
                 SecureField("Password", text: $password)
+                    .textContentType(.password)
                     .textInputAutocapitalization(.never)
-                    .foregroundColor(.primary)
             }
-            
-            Section {
-                Button(action: {
-                    Task { await login() }
-                }) {
+        }
+    }
+
+    private var loginButton: some View {
+        Button {
+            Task { await login() }
+        } label: {
+            Group {
+                if isLoading {
+                    ProgressView()
+                        .tint(.white)
+                } else {
                     Text("Login")
-                        .frame(maxWidth: .infinity)
-                        .foregroundColor(.white)
-                        .padding()
-                        .background(isFormValid ? Color.blue : Color.gray)
-                        .cornerRadius(8)
+                        .fontWeight(.semibold)
                 }
-                .disabled(!isFormValid)
-                .listRowBackground(Color.clear)
             }
-            
-            Section {
-                NavigationLink {
-                    RegistrationScreen()
-                } label: {
-                    Text("Registration")
-                        .frame(maxWidth: .infinity)
-                        .foregroundColor(.white)
-                        .padding()
-                        .background(isFormValid ? Color.blue : Color.gray)
-                        .cornerRadius(8)
-                }
-                .listRowBackground(Color.clear)
-            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.glassProminent)
+        .controlSize(.large)
+        .disabled(!isFormValid || isLoading)
+    }
+
+    private var registrationLink: some View {
+        NavigationLink {
+            RegistrationScreen()
+        } label: {
+            Text("Don't have an account? \(Text("Register").fontWeight(.semibold))")
+                .font(.subheadline)
         }
     }
 }
 
 #Preview {
-    LoginScreen()
+    NavigationStack {
+        LoginScreen()
+    }
+    .environment(ErrorState())
 }

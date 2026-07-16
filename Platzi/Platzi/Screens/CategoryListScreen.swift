@@ -2,17 +2,18 @@ import SwiftUI
 
 struct CategoryListScreen: View {
     @Environment(PlatziStore.self) private var store
+    @Environment(ErrorState.self) private var errorState
     @State private var isLoading: Bool = false
     @State private var showAddCategoryScreen: Bool = false
-    
+
     private func loadCategories() async {
         defer { isLoading = false }
-        
+
         do {
             isLoading = true
             try await store.loadCategories()
         } catch {
-            print(error.localizedDescription)
+            errorState.error = error
         }
     }
     
@@ -50,6 +51,7 @@ struct CategoryListScreen: View {
             NavigationStack {
                 AddCategoryScreen()
             }
+            .globalErrorAlert()
         })
         .navigationTitle("Categories")
     }
@@ -58,5 +60,7 @@ struct CategoryListScreen: View {
 #Preview {
     NavigationStack {
         CategoryListScreen()
-    }.environment(PlatziStore(httpClient: HTTPClient()))
+    }
+    .environment(PlatziStore(httpClient: HTTPClient()))
+    .environment(ErrorState())
 }
