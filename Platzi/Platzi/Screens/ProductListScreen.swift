@@ -6,6 +6,7 @@ struct ProductListScreen: View {
     @Environment(PlatziStore.self) private var store
     @State private var products: [Product] = []
     @State private var isLoading: Bool = false
+    @State private var showAddProductScreen: Bool = false
     
     private func loadProducts() async {
         guard !isLoading else { return }
@@ -42,6 +43,20 @@ struct ProductListScreen: View {
                 ProgressView("Loading...")
             }
         }
+        .sheet(isPresented: $showAddProductScreen, content: {
+            NavigationStack {
+                AddProductScreen(selectedCategory: category.id) { product in
+                    products.append(product)
+                }
+            }
+        })
+        .toolbar(content: {
+            ToolbarItem {
+                Button("Add Product") {
+                    showAddProductScreen = true
+                }
+            }
+        })
         .task {
             Task { await loadProducts() }
         }
