@@ -27,4 +27,9 @@ class PlatziStore {
         let category = try await httpClient.load(resource)
         categories.append(category)
     }
+    
+    func fetchProductsBy(_ categoryId: Int) async throws -> [Product] {
+        let resource = Resource(url: Constants.Urls.getProductsByCategory(categoryId), modelType: [Product].self)
+        return try await httpClient.load(resource)
+    }
 }

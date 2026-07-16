@@ -4,7 +4,7 @@ struct CategoryCellView: View {
     let category: Category
     
     var body: some View {
-        HStack {
+        HStack() {
             AsyncImage(url: category.image) { img in
                 img
                     .resizable()
@@ -14,7 +14,12 @@ struct CategoryCellView: View {
                 ImagePlaceHolderView()
             }
             Text(category.name)
+            Spacer()
         }
     }
+}
+
+#Preview {
+    CategoryCellView(category: .init(id: 1, name: "teste", image: URL.randomImageURL))
 }
 
