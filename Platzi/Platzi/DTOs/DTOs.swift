@@ -87,3 +87,4 @@ struct CreateProductRequest: Codable {
     let categoryId: Int
     let images: [URL]
 }
+
