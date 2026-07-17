@@ -2,12 +2,12 @@ import SwiftUI
 
 struct ProfileScreen: View {
     
-    @Environment(\.authenticationController) private var authenticationController
-    
+    @Environment(\.authenticationService) private var authenticationService
+
     var body: some View {
         // Sign Out Button
         Button(action: {
-            authenticationController.signOut()
+            authenticationService.signOut()
         }) {
             Text("Sign Out")
                 .fontWeight(.semibold)

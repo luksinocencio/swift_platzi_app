@@ -8,10 +8,10 @@ class LoginViewModel {
     var password: String = "password1234"
     var isLoading: Bool = false
 
-    private let authenticationController: AuthenticationController
+    private let authenticationService: AuthenticationService
 
-    init(authenticationController: AuthenticationController = AuthenticationController(httpClient: HTTPClient())) {
-        self.authenticationController = authenticationController
+    init(authenticationService: AuthenticationService = AuthenticationService()) {
+        self.authenticationService = authenticationService
     }
 
     var isFormValid: Bool {
@@ -21,6 +21,6 @@ class LoginViewModel {
     func login() async throws -> Bool {
         isLoading = true
         defer { isLoading = false }
-        return try await authenticationController.login(email: email, password: password)
+        return try await authenticationService.login(email: email, password: password)
     }
 }

@@ -3,7 +3,7 @@ import SwiftUI
 @main
 struct PlatziApp: App {
     @AppStorage(Constants.Keys.isAuthenticated) private var isAuthenticated: Bool = false
-    @Environment(\.authenticationController) private var authenticationController
+    @Environment(\.authenticationService) private var authenticationService
     @State private var isLoading = true
     @State private var errorState = ErrorState()
     
@@ -17,7 +17,7 @@ struct PlatziApp: App {
                 if isLoading {
                     ProgressView("Loading...")
                         .task {
-                            isAuthenticated = await authenticationController.checkAuthentication()
+                            isAuthenticated = await authenticationService.checkAuthentication()
                             isLoading = false
                         }
                 } else if isAuthenticated {

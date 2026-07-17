@@ -24,8 +24,7 @@ Autenticação (login/registro/refresh/logout), categorias, produtos (listar/cri
 ```
 Platzi/Platzi/
 ├── PlatziApp.swift          # Entry point (@main), roteamento auth, ErrorState global
-├── Controllers/             # Serviço de autenticação (AuthenticationController)
-├── Services/                # Camada de dados stateless (PlatziService)
+├── Services/                # Camada de dados stateless (PlatziService + extensões, AuthenticationService)
 ├── ViewModels/              # Um ViewModel por tela com estado (sufixo *ViewModel)
 ├── Networking/              # HTTPClient, Resource, HTTPMethod
 ├── Models/                  # Modelos de domínio (Category, Product, Location)
@@ -43,7 +42,9 @@ Platzi/Platzi/
 - Requests/responses da API (`*Request`, `*Response`) → `DTOs/`, um arquivo por tipo.
 - Telas → `Screens/` com sufixo `Screen`; componentes reutilizáveis → `Views/`.
 - Estado e lógica de tela → `ViewModels/` com sufixo `ViewModel`.
-- Chamadas de rede novas → método no `PlatziService` (domínio) ou `AuthenticationController` (auth); ViewModels chamam o serviço, nunca o `HTTPClient` direto.
+- Chamadas de rede novas → método no `PlatziService` (domínio) ou `AuthenticationService` (auth); ViewModels chamam o serviço, nunca o `HTTPClient` direto.
+- Endpoints do `PlatziService` organizados em **extensões por domínio**, um arquivo cada: `PlatziService+Categories.swift`, `PlatziService+Products.swift`, `PlatziService+Locations.swift`. Domínio novo → novo arquivo `PlatziService+X.swift`.
+- **Nunca** adicionar endpoints como extensão do `HTTPClient` — ele é transporte genérico e não conhece a API.
 - Telas puramente apresentacionais (ex.: `ProductDetailScreen`, `LocationDetailScreen`) não precisam de ViewModel.
 
 ## 3. Camada de Rede
@@ -52,21 +53,25 @@ Platzi/Platzi/
 ```swift
 struct Resource<T: Codable> {
     let url: URL
-    var method: HTTPMethod = .get([])
+    var method: HTTPMethod = .get          // enum String simples: .get/.post/.put/.delete
+    var body: Data? = nil                  // corpo JSON (POST/PUT)
+    var queryItems: [URLQueryItem] = []    // query string
     var headers: [String: String]? = nil
-    var modelType: T.Type
+    var modelType: T.Type                  // tipo esperado na resposta
 }
 ```
 
 ### `HTTPMethod`
-`enum` com casos `.get([URLQueryItem])`, `.post(Data?)`, `.put(Data?)`, `.delete`, e propriedade `name` retornando o verbo HTTP.
+`enum HTTPMethod: String` simples (`.get`, `.post`, `.put`, `.delete`) — o `rawValue` vai direto na `URLRequest`. **Sem valores associados**: body e query vivem no `Resource`.
 
 ### `HTTPClient`
 - Método genérico `load<T: Codable>(_ resource:) async throws -> T`.
+- Internamente dividido em passos nomeados: `makeRequest(for:)` (monta URLRequest: query → verbo/corpo → token → headers) e `performRequest` (executa, valida status, decodifica).
 - Injeta automaticamente `Authorization: Bearer <accessToken>` a partir do Keychain.
 - **Auto-refresh:** ao receber `401/unauthorized`, tenta `refreshToken()` e refaz a requisição uma vez; se falhar, lança `.unauthorized`.
 - Mapeia status codes → `NetworkError` (200..<300 ok, 401 unauthorized, 404 notFound, resto `undefined`).
 - Decodifica com `JSONDecoder()`; erro de decode vira `.decodingError`.
+- **Comentários:** as camadas Networking/Services têm comentários explicativos em pt-br — mantenha esse padrão ao alterá-las.
 
 ### Padrão para adicionar um endpoint
 1. Adicione a URL em `Constants.Urls` (estática ou função se tiver parâmetro):
@@ -75,7 +80,7 @@ struct Resource<T: Codable> {
    static func deleteProduct(_ id: Int) -> URL { URL(string: "...\(id)")! }
    ```
 2. Crie DTOs Codable de request/response em `DTOs/` (um arquivo por tipo).
-3. Adicione um método **stateless** no `PlatziService` (dados de domínio) ou `AuthenticationController` (auth), retornando o valor:
+3. Adicione um método **stateless** na extensão de domínio correspondente do `PlatziService` (ou `AuthenticationService` para auth), retornando o valor:
    ```swift
    func loadCategories() async throws -> [Category] {
        let resource = Resource(url: Constants.Urls.categories, modelType: [Category].self)
@@ -114,23 +119,23 @@ class CategoryListViewModel {
 Regras:
 - `@MainActor @Observable class`, sufixo `ViewModel`, em `ViewModels/`.
 - Estado da tela (`isLoading`, listas, campos de formulário, `isFormValid`) vive no ViewModel.
-- Dependências (`PlatziService`, `AuthenticationController`) injetadas no `init` com default — permite mock em testes.
+- Dependências (`PlatziService`, `AuthenticationService`) injetadas no `init` com default — permite mock em testes.
 - Métodos assíncronos **lançam** (`throws`); quem captura é a tela, roteando para o `ErrorState`.
 - Criado na tela com `@State private var viewModel = XViewModel()`; se precisar de parâmetro, use `init` na tela com `_viewModel = State(initialValue: XViewModel(...))`.
 - Bindings de formulário direto no VM: `TextField("Title", text: $viewModel.title)`.
 - Dados criados em telas modais voltam por closure `onSave: (T) -> Void` e são inseridos no VM da tela pai (ex.: `viewModel.add(category)`).
 
 ### `PlatziService` — camada de dados
-`struct` stateless em `Services/`; recebe `HTTPClient` no `init` (default). Só faz requisições e retorna valores — nunca guarda estado.
+`struct` stateless em `Services/`; recebe `HTTPClient` no `init` (default). Só faz requisições e retorna valores — nunca guarda estado. Endpoints em extensões por domínio (`PlatziService+Categories.swift`, etc.).
 
-### `AuthenticationController`
-- `struct` com `HTTPClient`; injetado via `EnvironmentValues` usando `@Entry`:
+### `AuthenticationService`
+- `struct` com `HTTPClient` (init com default); usado pelos ViewModels de auth via DI e injetado via `EnvironmentValues` usando `@Entry` para `PlatziApp`/`ProfileScreen`:
   ```swift
   extension EnvironmentValues {
-      @Entry var authenticationController = AuthenticationController(httpClient: HTTPClient())
+      @Entry var authenticationService = AuthenticationService()
   }
   ```
-- Consumido com `@Environment(\.authenticationController) private var authenticationController`.
+- Consumido com `@Environment(\.authenticationService) private var authenticationService`.
 
 ### Persistência de sessão
 - **Tokens:** `Keychain<T: Codable>` (wrapper genérico do Security framework).
@@ -259,7 +264,7 @@ Ao criar novos erros, siga o mesmo padrão: `enum` de erro + extensão `Localize
 
 1. [ ] URL adicionada em `Constants.Urls`.
 2. [ ] Request/response em `DTOs/`; modelo de domínio em `Models/` (com `CodingKeys` se snake_case).
-3. [ ] Método stateless em `PlatziService` (domínio) ou `AuthenticationController` (auth), retornando valor.
+3. [ ] Método stateless na extensão de domínio do `PlatziService` (ou `AuthenticationService` para auth), retornando valor.
 4. [ ] ViewModel em `ViewModels/` (`@MainActor @Observable`, DI via `init` com default, métodos `throws`).
 5. [ ] Tela em `Screens/` com sufixo `Screen` consumindo o VM; componentes em `Views/`.
 6. [ ] Estados de loading (`ProgressView`) e vazio (`ContentUnavailableView`).

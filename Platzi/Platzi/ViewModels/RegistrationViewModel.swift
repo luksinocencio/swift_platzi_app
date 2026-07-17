@@ -10,10 +10,10 @@ class RegistrationViewModel {
     var isLoading: Bool = false
     var successMessage: String?
 
-    private let authenticationController: AuthenticationController
+    private let authenticationService: AuthenticationService
 
-    init(authenticationController: AuthenticationController = AuthenticationController(httpClient: HTTPClient())) {
-        self.authenticationController = authenticationController
+    init(authenticationService: AuthenticationService = AuthenticationService()) {
+        self.authenticationService = authenticationService
     }
 
     var isFormValid: Bool {
@@ -50,7 +50,7 @@ class RegistrationViewModel {
     func register() async throws {
         isLoading = true
         defer { isLoading = false }
-        let response = try await authenticationController.register(name: name, email: email, password: password)
+        let response = try await authenticationService.register(name: name, email: email, password: password)
         successMessage = "Registration for user \(response.name) is completed."
     }
 }

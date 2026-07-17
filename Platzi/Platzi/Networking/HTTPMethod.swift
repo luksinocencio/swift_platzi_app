@@ -1,21 +1,10 @@
 import Foundation
 
-enum HTTPMethod {
-    case get([URLQueryItem])
-    case post(Data?)
-    case delete
-    case put(Data?)
-    
-    var name: String {
-        switch self {
-        case .get:
-            return "GET"
-        case .post:
-            return "POST"
-        case .delete:
-            return "DELETE"
-        case .put:
-            return "PUT"
-        }
-    }
+/// Os verbos HTTP que a API aceita.
+/// O `rawValue` (ex.: "GET") é o texto que vai direto na URLRequest.
+enum HTTPMethod: String {
+    case get = "GET"
+    case post = "POST"
+    case put = "PUT"
+    case delete = "DELETE"
 }
